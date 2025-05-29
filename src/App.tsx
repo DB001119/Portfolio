@@ -3,7 +3,9 @@ import './App.css';
 import Navbar from './components/Navbar.tsx';
 import MicroInteraction from './components/MicroInteraction.tsx';
 import CursorGlow from './components/CursorGlow.tsx';
+import ContactAdmin from './components/ContactAdmin.tsx';
 import { motion } from 'framer-motion';
+import { submitContactForm, type ContactFormData } from './services/contactService.ts';
 
 export default function App() {
   const [activeSkill, setActiveSkill] = useState('01');
@@ -12,6 +14,20 @@ export default function App() {
     hero: false,
     about: false
   });
+
+  // Contact form state
+  const [formData, setFormData] = useState<ContactFormData>({
+    fullName: '',
+    email: '',
+    subject: '',
+    message: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [submitMessage, setSubmitMessage] = useState('');
+
+  // Check if user is accessing admin page
+  const isAdminPage = window.location.pathname === '/admin';
 
   // Handle initial page loading
   useEffect(() => {
@@ -22,12 +38,80 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // If accessing admin page, show admin component
+  if (isAdminPage) {
+    return (
+      <div className="min-h-screen bg-light-bg dark:bg-dark-bg">
+        <div className="p-4">
+          <div className="mb-4">
+            <a 
+              href="/" 
+              className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+            >
+              ← Back to Portfolio
+            </a>
+          </div>
+          <ContactAdmin />
+        </div>
+      </div>
+    );
+  }
+
   // Handle image loading
   const handleImageLoad = (imageType: 'hero' | 'about') => {
     setImagesLoaded(prev => ({
       ...prev,
       [imageType]: true
     }));
+  };
+
+  // Handle form input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle form submission
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitStatus('idle');
+
+    try {
+      await submitContactForm(formData);
+      
+      setSubmitStatus('success');
+      setSubmitMessage('Thank you! Your message has been sent successfully. I\'ll get back to you soon!');
+      
+      // Reset form
+      setFormData({
+        fullName: '',
+        email: '',
+        subject: '',
+        message: ''
+      });
+
+      // Clear success message after 5 seconds
+      setTimeout(() => {
+        setSubmitStatus('idle');
+        setSubmitMessage('');
+      }, 5000);
+
+    } catch (error) {
+      setSubmitStatus('error');
+      setSubmitMessage('Sorry, there was an error sending your message. Please try again or contact me directly at dipanbash11@gmail.com');
+      
+      // Clear error message after 5 seconds
+      setTimeout(() => {
+        setSubmitStatus('idle');
+        setSubmitMessage('');
+      }, 5000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const skills = {
@@ -863,7 +947,7 @@ export default function App() {
 
               {/* Right side - Contact Form */}
               <div className="bg-white dark:bg-dark-card rounded-2xl shadow-xl p-6 sm:p-8 lg:p-10">
-                <form className="space-y-4 sm:space-y-6">
+                <form className="space-y-4 sm:space-y-6" onSubmit={handleFormSubmit}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <div>
                       <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 font-body">
@@ -876,6 +960,8 @@ export default function App() {
                         required
                         className="form-input w-full text-sm sm:text-base focus:scale-[1.04] transition-transform duration-200 font-body"
                         placeholder="Enter your full name"
+                        value={formData.fullName}
+                        onChange={handleInputChange}
                       />
                     </div>
 
@@ -890,6 +976,8 @@ export default function App() {
                         required
                         className="form-input w-full text-sm sm:text-base focus:scale-[1.04] transition-transform duration-200 font-body"
                         placeholder="Enter your email"
+                        value={formData.email}
+                        onChange={handleInputChange}
                       />
                     </div>
                   </div>
@@ -905,6 +993,8 @@ export default function App() {
                       required
                       className="form-input w-full text-sm sm:text-base focus:scale-[1.04] transition-transform duration-200 font-body"
                       placeholder="What's this about?"
+                      value={formData.subject}
+                      onChange={handleInputChange}
                     />
                   </div>
 
@@ -919,6 +1009,8 @@ export default function App() {
                       className="form-textarea w-full text-sm sm:text-base focus:scale-[1.04] transition-transform duration-200 font-body"
                       placeholder="Enter your message"
                       rows={4}
+                      value={formData.message}
+                      onChange={handleInputChange}
                     ></textarea>
                   </div>
 
@@ -927,8 +1019,9 @@ export default function App() {
                       <button
                         type="submit"
                         className="magnetic-button primary full text-sm sm:text-base"
+                        disabled={isSubmitting}
                       >
-                        Send Message
+                        {isSubmitting ? 'Sending...' : 'Send Message'}
                         <svg 
                           xmlns="http://www.w3.org/2000/svg" 
                           viewBox="0 0 20 20" 
@@ -943,6 +1036,107 @@ export default function App() {
                         </svg>
                       </button>
                     </MicroInteraction>
+                    
+                    {/* Enhanced Status Message */}
+                    {submitStatus !== 'idle' && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                        transition={{ 
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 30,
+                          duration: 0.4 
+                        }}
+                        className={`mt-6 p-4 rounded-xl text-sm font-body shadow-lg border-l-4 ${
+                          submitStatus === 'success'
+                            ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-l-green-500 dark:border-l-green-400 text-green-800 dark:text-green-200 shadow-green-100 dark:shadow-green-900/20'
+                            : 'bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border-l-red-500 dark:border-l-red-400 text-red-800 dark:text-red-200 shadow-red-100 dark:shadow-red-900/20'
+                        }`}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className="flex-shrink-0 mt-0.5">
+                            {submitStatus === 'success' ? (
+                              <motion.div
+                                initial={{ scale: 0, rotate: -180 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                transition={{ delay: 0.2, type: "spring", stiffness: 500 }}
+                                className="w-6 h-6 bg-green-500 dark:bg-green-400 rounded-full flex items-center justify-center"
+                              >
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                initial={{ scale: 0, rotate: 180 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                transition={{ delay: 0.2, type: "spring", stiffness: 500 }}
+                                className="w-6 h-6 bg-red-500 dark:bg-red-400 rounded-full flex items-center justify-center"
+                              >
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </motion.div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <motion.p 
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.3 }}
+                              className="font-medium leading-relaxed"
+                            >
+                              {submitMessage}
+                            </motion.p>
+                            {submitStatus === 'success' && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.4 }}
+                                className="mt-2 flex items-center space-x-2 text-xs opacity-75"
+                              >
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                </svg>
+                                <span>This message will disappear in 5 seconds</span>
+                              </motion.div>
+                            )}
+                          </div>
+                          {/* Dismiss button */}
+                          <button
+                            onClick={() => {
+                              setSubmitStatus('idle');
+                              setSubmitMessage('');
+                            }}
+                            className="flex-shrink-0 ml-2 p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors duration-200"
+                            aria-label="Dismiss message"
+                          >
+                            <svg className="w-4 h-4 opacity-60 hover:opacity-100" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
+                        
+                        {/* Progress bar for auto-dismiss */}
+                        {submitStatus === 'success' && (
+                          <motion.div
+                            className="mt-3 h-1 bg-green-200 dark:bg-green-800 rounded-full overflow-hidden"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.5 }}
+                          >
+                            <motion.div
+                              className="h-full bg-green-500 dark:bg-green-400 rounded-full"
+                              initial={{ width: "100%" }}
+                              animate={{ width: "0%" }}
+                              transition={{ duration: 5, ease: "linear" }}
+                            />
+                          </motion.div>
+                        )}
+                      </motion.div>
+                    )}
                   </div>
                 </form>
               </div>
